@@ -4,8 +4,8 @@
 
 * API HTTP Rest based on Node.js / [Sails.js](sailsjs.org)) and [MongoDB](https://www.mongodb.com/)
 * A couple of prerequisites are needed to run the application locally
-  * [Node.js 4.4.5 (LTS)](https://nodejs.org/en/)
-  * [mongo 3.2](https://docs.mongodb.org/manual/installation/)
+  * [Node.js](https://nodejs.org/en/)
+  * [Mongo](https://docs.mongodb.org/manual/installation/)
 * Provides CRUD (Create / Read / Update / Delete HTTP verbs) on a “Message” model
 
 HTTP verb | URI | Action
@@ -18,28 +18,37 @@ DELETE | /message/ID | delete message with ID
 
 ## Setup
 
-* Install Sails.js (it's to Node.js what RoR is to Ruby): ```sudo npm install sails -g``` (should install 0.12.3)
+* Install [Node.js](https://nodejs.org/en/download/) and [MongoDB](https://docs.mongodb.org/manual/installation/).
+  * As of Sept 20, 2019 this was tested with node v10.16.3, npm v6.9.0, and MongoDB community v4.2.
+* Install Sails.js (it's to Node.js what RoR is to Ruby): ```sudo npm install sails -g```
+  * Tested with v1.2.3, Sept 20, 2019
 * Create the  application:  ```sails new messageApp && cd messageApp```
+  * When prompted to "Choose a template" select option _2. Empty_
 * Link application to local MongoDB
   * usage of sails-mongo orm: ```npm install sails-mongo --save```
-  * change the 2 following configuration files
+  * change the lines shown below in the two following configuration files (both files have many other lines - you only need to edit the settings shown here):
 
-```
+```javascript
 config/model.js:
 module.exports.models = {
-connection: 'mongo',
- migrate: 'safe'
+  migrate: 'alter',
+  id: { type: 'string', columnName: '_id' },
 };
 ```
 
-```
-config/connections.js:
-module.exports.connections = {
-  mongo: {
+```javascript
+config/datastores.js:
+module.exports.datastores = {
+  default: {
      adapter: 'sails-mongo',
      url: process.env.MONGO_URL || 'mongodb://localhost/messageApp'
   }
 };
+```
+
+```json
+package.json:
+  "start": "NODE_ENV=development node app.js",
 ```
 
 * Generate the API scafold  ```sails generate api message```
@@ -49,18 +58,18 @@ module.exports.connections = {
 ## Test the application in command line
 
 * Get current list of messages
-  * ```curl http://localhost:1337/message```
+  * `curl http://localhost:1337/message`
 
 ```
 []
 ```
 
 * Create new messages
-  * ```curl -XPOST http://localhost:1337/message?text=hello```
-  * ```curl -XPOST http://localhost:1337/message?text=hola```
+  * `curl -XPOST http://localhost:1337/message?text=hello`
+  * `curl -XPOST http://localhost:1337/message?text=hola`
   
 * Get list of messages
-  * ```curl http://localhost:1337/message```
+  * `curl http://localhost:1337/message`
 
 ```
 [
@@ -79,13 +88,15 @@ module.exports.connections = {
 ]
 ```
 * Modify a message
-  * ```curl -XPUT http://localhost:1337/message/5638b363c5cd0825511690bd?text=hey```
+  * `curl -XPUT http://localhost:1337/message/5638b363c5cd0825511690bd?text=hey`
+  * Note that you will have to substitute your own "id" value from the previous list of messages in place of the value `5638b363c5cd0825511690bd` shown in the example.
 
 * Delete a message
-  * ```curl -XDELETE http://localhost:1337/message/5638b381c5cd0825511690be```
+  * `curl -XDELETE http://localhost:1337/message/5638b381c5cd0825511690be`
+  * Again, substitute one of your own "id" values
 
 * Get list of messages
-  * ```curl http://localhost:1337/message```
+  * `curl http://localhost:1337/message`
 
 ```
 [
@@ -97,3 +108,5 @@ module.exports.connections = {
   }
 ]
 ```
+
+Congratulations! You have a functioning Node.js HTTP API! Now [move on to containerizing it](./2_application_image.md).

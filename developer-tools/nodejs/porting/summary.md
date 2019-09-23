@@ -1,15 +1,16 @@
-# What we done so far
+# What we did in the _Node.js Programming in Docker Containers_ tutorial
 
-* setup Docker for a simple Node.js / MongoDB application
+* Setup Docker for a simple Node.js / MongoDB application
 
-* created image for the application
-  * containing all the parts to run the application (runtime Node.js, librairies, application code)
+* Created a container image for the application
+  * containing all the parts to run the application (runtime Node.js, libraries, application code)
 
-* portable image (dev / test / qa / prod) available through Docker Cloud
+* Pushed the container image to Docker Hub to make it available elsewhere
 
-* scalability of the application (API)
+* Scaled the service from a single node, to a cluster, to Docker Swarm and Kubernetes
   * on a single node (for dev / test purposes)
   * on a cluster of Docker hosts
   * on a Docker Swarm
+  * on Kubernetes
 
-* We also seen several Docker components and how they are integrated together
+* We also looked at several Docker components and how they are integrated together
