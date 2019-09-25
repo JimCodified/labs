@@ -16,6 +16,8 @@ Some of the Docker basics will be reviewed but it is recommended to follow [Dock
 
 ## Lab Steps
 
+[Setup or access Docker + Kubernetes](0_setup.md)
+
 [Setup our sample node application](1_node_application.md)
 
 [Create the application's image](2_application_image.md)

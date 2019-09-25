@@ -1,20 +1,12 @@
 # Container networking on a single Docker host
 
-## Docker host creation
-
-We will use [Docker Machine](https://docs.docker.com/machine/) to create our test Docker Host. Driver's option is set to **virtualbox** so the host is created on the local machine as a virtualbox virtual machine.
-
-```docker-machine create --driver virtualbox node1```
-
-Get the IP of node1 ```docker-machine ip node1``` (⇒ 192.168.99.100)
+In this exercise, we will bring up both of the containers for our application and connect them to each other so our Node.js API can communicate with our MongoDB database.
 
 ## Default networks
 
-Let's check the networks attached to the newly created Docker host
+By default, your Docker Engine already has some default networks:
 
-```
-$ eval $(docker-machine env node1)
-
+```bash
 $ docker network ls
 NETWORK ID          NAME            DRIVER
 d87b8fc4c466        bridge          bridge
@@ -22,20 +14,20 @@ efaf610f57a5        host            host
 f7d0de539edd        none            null
 ```
 
-**By default (if no --net option is provided), Docker engine will attach each container to the bridge network (id d87b8fc4c466)**
+By default (if no `--net` option is provided), Docker Engine will attach each container to the bridge network (ID _d87b8fc4c466_ in the output above, although network IDs will vary).
 
 ## Default bridge network
 
-Let's run 2 container using the default bridge network (without using --net option)
+Let's run 2 containers using the default bridge network without using the `--net` option, to see how they behave.
 
 ```
-$ docker run --name mongo -d mongo:3.2
+$ docker run --name mongo -d mongo:4.2
 $ docker run --name box -d busybox top
 ```
 
-Make sure the containers are listed in the bridge network
+Make sure the containers are listed in the bridge network. You'll need your bridge NETWORK ID from the earlier command and substitute that in place of `d87b8fc4c466` in the example below (or you could just use the name `bridge` instead of the ID):
 
-```
+```bash
 $ docker network inspect --format='{{json .Containers}}' d87b8fc4c466 | python -m json.tool
 {
     "0b8fedf4613c7275d89861037ea1b23ad4d65ab10f16df67bf976d9cb5652311": {
@@ -54,23 +46,35 @@ $ docker network inspect --format='{{json .Containers}}' d87b8fc4c466 | python -
     }
 }
 ```
-Both containers appear as being linked to the bridge network but **they cannot address each other by their names**
 
-```
+The `Name` field tells us that both the `mongo` and `box` containers are connected to the bridge network. However, **they cannot address each other by their names** because we did not expose or publish any ports for either container to use. On the default bridge network the default behavior is to isolate every container.
+
+```bash
+# start a new busybox container and run an interactive shell:
 $ docker run -ti busybox /bin/sh
-/ # ping mongo
+
+# try to ping our other containers:
+/ $ ping mongo
 ping: bad address 'mongo'
-/ # ping box
+/ $ ping box
 ping: bad address 'box'
+
+/ $ exit
 ```
 
 ## User defined bridge network
 
-When using user defined network, the behaviour is different than the default bridge network.
+When we create a user defined network, the behaviour is different than the default bridge network.
 
 Let's create a user defined bridge network with Docker network commands
 
-````
+```bash
+# cleanup our earlier containers:
+$ docker container stop box mongo && docker container rm box mongo
+box
+mongo
+
+# create a new network
 $ docker network create mongonet
 ce9ea3b69d6ee2ecf56b40bd35b8a43f8505c8ca0473bc37bdede3711ecf60c1
 
@@ -80,15 +84,15 @@ d87b8fc4c466        bridge          bridge
 efaf610f57a5        host            host
 ce9ea3b69d6e        mongonet        bridge
 f7d0de539edd        none            null
-````
+```
 
 Let's now run 2 containers in the newly defined network
 
-````
+```
 $ docker run --name mongo --net mongonet -d mongo:3.2
 
 $ docker run --net mongonet -ti busybox /bin/sh
-/ # / # ping -c 3 mongo
+/ # ping -c 3 mongo
 PING mongo (172.18.0.2): 56 data bytes
 64 bytes from 172.18.0.2: seq=0 ttl=64 time=0.058 ms
 64 bytes from 172.18.0.2: seq=1 ttl=64 time=0.085 ms
@@ -97,62 +101,84 @@ PING mongo (172.18.0.2): 56 data bytes
 --- mongo ping statistics ---
 3 packets transmitted, 3 packets received, 0% packet loss
 round-trip min/avg/max = 0.058/0.071/0.085 ms
+
+/ # exit
+$ docker container stop box mongo && docker container rm mongo
+box
+mongo
 ````
 
 Containers can be addressed by their name through the DNS name server embedded in Docker 1.10+
 
-## Test our application
+## Running our full application
 
 Run db and application containers in the new bridge network
 
-```
-$ docker run --name mongo --net mongonet -d mongo:3.2
-$ docker run --name app --net mongonet -p 8000:1337 -d -e “MONGO_URL=mongodb://mongo/messageApp” message-app:v1
+```bash
+$ docker run --name mongo --net mongonet -d mongo:4.2
+0dd9fd6a3108caa7cac6709ce89e60c5e474b4a051becac7562c4f30efeba293
+
+$ docker run --name app --net mongonet -p 8000:1337 -d -e "MONGO_URL=mongodb://mongo/messageApp" message-app:latest
+2d52bb5772f771b8ddb9177cbd5c9a53e6e1915743a129a09add10805b48a967
 ```
 
-Note: MONGO_URL environment variable directly uses **mongo** container’s name
+Note: The `-e` switch sets an environment variable MONGO_URL inside the container which directly uses **mongo** container’s name
 
 Test HTTP Rest API
 
-```
+```bash
 # Create a  new message
-$ curl -XPOST http://192.168.99.100:8000/message?text=hello
+$ curl -XPOST http://localhost:8000/message?text=hello
 {
   "text": "hello",
-  "createdAt": "2016-06-06T14:01:05.764Z",
-  "updatedAt": "2016-06-06T14:01:05.764Z",
+  "createdAt": "1569451938332",
+  "updatedAt": "1569451938332",
   "id": "57558221a4461312009ce88c"
 }
 
 # Retrieve the list of message and make sure the previous message is present
-$ curl -XGET http://192.168.99.100:8000/message
+$ curl -XGET http://localhost:8000/message
 [
   {
     "text": "hello",
-    "createdAt": "2016-06-06T14:01:05.764Z",
-    "updatedAt": "2016-06-06T14:01:05.764Z",
+    "createdAt": "1569451938332",
+    "updatedAt": "1569451938332",
     "id": "57558221a4461312009ce88c"
   }
 ]
+
+# cleanup
+$ docker container stop mongo app && docker container rm mongo app
+mongo
+app
+mongo
+app
 ```
 
-The application container (named **app**) is connected to mongo container using container name (named **mongo**)
+The application container (named **app**) is connected to mongo container using container name (named **mongo**).
 
-## Packaging of the application with Docker Compose
+**Congratulations! You've successfully containerized your application!**
 
-The following file (docker-compose.yml) defines the whole application
+However, there is a better way to specify and run multiple containers together rather than manually creating a network, then launching each container separately with all the switches to wire it up.
 
-```
-version: '3'
+## Specifying the application services with Docker Compose
+
+The following file defines the whole application. Better yet, it's using images from Docker Hub so you can take this Compose file to any system with Docker Engine and run it the same way, with the same images.
+
+Copy this code into a file on your system named `docker-compose.yaml` - don't forget to substitute your own Docker Hub image for the `app:` service.
+
+```yaml
+version: '3.6'
 services:
   mongo:
-    image: mongo:3.2
+    image: mongo:4.2
     volumes:
       - mongo-data:/data/db
     expose:
       - "27017"
   app:
-    image: lucj/message-app
+    # NOTE: you should substitute your own Docker Hub info below
+    image: jimmyarms/labs-nodejs:001
     ports:
       - "1337"
     links:
@@ -165,13 +191,14 @@ volumes:
   mongo-data:
 ```
 
-The important part of this file
+The important part of this file:
+
 * Definition of 2 services
-  * database service: mongo
-  * application service: app
+  * database service: **mongo**
+  * application service: **app**
 * Link between **app** and **mongo** services done through the MONGO_URL environment variable (using **mongo** service name)
 * Port mapping
-  * mongo service expose port 27017 (default MongoDB port) only to the other services (not to the Docker host)
+  * mongo service exposes port 27017 (default MongoDB port) only to the other services listed in this Compose file (not to the Docker host)
   * app service port is mapped to a random port on the host (as no host port as been defined)
 * Definition of a user defined volume for mongodb data folder
 
