@@ -57,9 +57,20 @@ Basically, the Dockerfile performs the following actions:
 
 ## Image creation
 
-* Create the image at the command line (the `.` at the end is important): `docker build -t message-app .`
+* Create the image at the command line (the `.` at the end is important):
 
-* List all images available on the Docker host with the name "message-app": `docker images message-app`
+```bash
+docker build -t message-app .
+```
+
+* List all images available on the Docker host with the name "message-app": 
+
+```bash
+docker images message-app
+
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+message-app         latest              1783ed74716a        47 hours ago        164MB
+```
 
 ## Let's instantiate a container
 
@@ -79,4 +90,4 @@ error: Error: Failed to connect to MongoDB.  Are you sure your configured Mongo 
      message: 'connect ECONNREFUSED 127.0.0.1:27017' } }
 ```
 
-**The application cannot connect to a database as we did not provide external db information nor did we start a container running MongoDB**. We'll do that in [the next step](3_publish_image.md).
+**The application cannot connect to a database as we did not provide external db information nor did we start a container running MongoDB**. We'll do that in shortly, but first we want to make sure to [save our application image in more permanent fashion](3_publish_image.md), so we can resume on another machine later or share with others.
