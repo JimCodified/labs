@@ -4,7 +4,7 @@
   1. one image for the Node.js application
   2. one image for the MongoDB database
 
-## The Application
+## The Node.js Application
 
 * There are several possibilities to create the image
   1. Extend an official Linux distribution image (Ubuntu, CentOS, ...) and install Node.js runtime
@@ -13,18 +13,18 @@
 
 We'll go for the third option as it offers an optimized image, built following Docker's best practices, with new versions created regularly as Node.js releases updates.
 
-Look for the _Official Image, Verified Publisher,_ or _Docker Certified_ badges when you search Hub to know you're getting safe content.
+**TIP**: Look for the _Official Image, Verified Publisher,_ or _Docker Certified_ badges when you search Hub to know you're getting safe content.
 ![Official Image badge](./images/official_image.png)
 
-## Database
+## The Database
 
-* Usage of the official [MongoDB image](https://hub.docker.com/_/mongo)
+* Following the logic from above, we'll make use of the Docker Official [MongoDB image](https://hub.docker.com/_/mongo)
 
-## Dockerfile
+## The Dockerfile
 
-We'll use the following Dockerfile to build our application's image:
+We'll use the following Dockerfile to build our Node.js application image:
 
-```
+```Dockerfile
 # Use node 10.16.3 on Alpine Linux
 FROM node:10.16.3-alpine
 ENV LAST_UPDATED 20190920T165400
@@ -47,22 +47,23 @@ CMD ["npm","start"]
 
 Basically, the Dockerfile performs the following actions:
 
-* Start FROM the official node:10.16.3 image on Alpine Linux
-  * _Alpine_ is a minimal Linux distribution so the base layer is only around 5 MB. With the Node.js and npm packages the full image is only ~24MB. Other images are available as well.
-* COPY application sources in to the WORKDIR
-* RUN npm to install dependencies
-* EXPOSE port to the outside from the Docker host
-* define default command (CMD) to run when instantiating the image
+* Start `FROM` the official node version 10.16.3 image on Alpine Linux
+  * _Alpine_ is a minimal Linux distribution so the base layer is only around 5 MB. With the Node.js and npm packages the full image is only ~24MB. Other Docker Official image variants are available, if you have specific requirements.
+  * It is a best practice to specify the specific version you need in the base image, rather than a generic tag like `:latest`. We specified `10.16.3` because that is what was installed on our system in Step 1 but there are [many versions available](https://hub.docker.com/_/node?tab=description).
+* `COPY` application sources in to the WORKDIR `/app`
+* `RUN` npm to install dependencies
+* `EXPOSE` port to the outside from the Docker host
+* define default command (`CMD`) to run when instantiating the image
 
 ## Image creation
 
-* Create the image `docker build -t message-app .`
+* Create the image at the command line (the `.` at the end is important): `docker build -t message-app .`
 
-* List all images available on the Docker host `docker images message-app`
+* List all images available on the Docker host with the name "message-app": `docker images message-app`
 
 ## Let's instantiate a container
 
-```
+```bash
 $ docker run message-app
 npm info it worked if it ends with ok
 ...
