@@ -67,8 +67,9 @@ You can also access an online environment that has everything already installed 
 
 ### Kubernetes
 
-If you want to complete part 7 you will also need to install Kubernetes. If you don't want to mess with that on your own machine you can access an online Docker + Kubernetes environment at https://labs.play-with-k8s.com/. Or, if you want you could install Kubernetes locally using something like [minikube](https://kubernetes.io/docs/tasks/tools/install-minikube/).
+If you want to complete the final step in this set of exercises you will also need to install Kubernetes. If you don't want to mess with that on your own machine you can access an online Docker + Kubernetes environment at https://labs.play-with-k8s.com/. Or, if you want you could install Kubernetes locally using something like [minikube](https://kubernetes.io/docs/tasks/tools/install-minikube/).
 
+---
 
 ## Optional: Use BuildKit
 
@@ -77,15 +78,21 @@ It's not required in the labs, but [BuildKit](https://docs.docker.com/develop/de
 To enable BuildKit:
 
 * Set an environment variable:
-  * `DOCKER_BUILDKIT=1` on macOS or Linux
+  * `DOCKER_BUILDKIT=1` on macOS or Linux, or
   * `setx DOCKER_BUILDKIT 1` on Windows 10
 
-You can also use the Preferences panel in Docker Desktop to turn on BuildKit:
+Alternatively, you can also use the Preferences panel in Docker Desktop to turn on BuildKit:
 
-1. Click the "Daemon" tab and then the "Advanced" button (you do not need to enable Experimental features)
+* Click the "Daemon" tab and then the "Advanced" button (you do not need to enable Experimental features)
 
 ![daemon tab](images/dd_daemon.png)
 
-2. Add the following lines:
+* Add the following lines (the comma is important):
+
+```json
+  "features" : {
+    "buildkit": true
+  },
+```
 
 ![buildkit](images/dd_buildkit.png)

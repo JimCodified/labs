@@ -1,68 +1,35 @@
 # Deployment on a Docker Swarm
 
-As for the multi Docker host environment, a Docker Swarm requires a key value store to gather the nodes / containers configurations and states.
-
-## Creation of a key-value store
-
-Note: if you still have the key-value store from the previous chapter do not re-create it and go directly to the creation of the Swarm.
-
-Several steps are needed to run the key-value store
-
-* Create dedicated Docker host with Machine) ```docker-machine create -d virtualbox consul```
-* Switch to context of the newly created machine ```eval "$(docker-machine env consul)"```
-* Run container based on Consul image ```docker run -d -p "8500:8500" -h "consul" progrium/consul -server -bootstrap```
+Even with only a single node you can create a Docker Swarm. If you have access to additional nodes you can add them and create a cluster, but that is not necessary for the step in this exercise.
 
 ## Creation of the Swarm
 
-Additional options need to be provided to docker-machine in order to define a Swarm.
+To enable Swarm on your Docker Engine:
 
-### Creation of the Swarm master
+```bash
+$ docker swarm init
+Swarm initialized: current node (o16nlc33ukub7zel71z3pcas1) is now a manager.
 
-```
-$ docker-machine create \
--d virtualbox \
---swarm \
---swarm-master \
---swarm-discovery="consul://$(docker-machine ip consul):8500" \
---engine-opt="cluster-store=consul://$(docker-machine ip consul):8500" \
---engine-opt="cluster-advertise=eth1:2376" \
-demo0
+To add a worker to this swarm, run the following command:
+
+    docker swarm join --token SWMTKN-1-51zt7i82u7gpyc2avhdbk9os26w6iiz9ltdr9ffcg7vwicem9n-3m9asope502zv9ehb02d2fxns 192.168.65.3:2377
+
+To add a manager to this swarm, run 'docker swarm join-token manager' and follow the instructions.
 ```
 
-### Creation of the Swarm agent
+That's it! You've not got a Docker Swarm-enabled node. If you're on a Linux system, play-with-docker.com or play-with-k8s.com you can add additional nodes by copying the `docker swarm join` command you've been given. Again, this is optional for these exercises.
 
-```
-$ docker-machine create \
- -d virtualbox \
---swarm \
---swarm-discovery="consul://$(docker-machine ip consul):8500" \
---engine-opt="cluster-store=consul://$(docker-machine ip consul):8500" \
---engine-opt="cluster-advertise=eth1:2376" \
-demo1
-```
-
-### List the nodes
-
-We have created 3 Docker hosts (key-store, Swarm master, Swarm agent)
-
-```
-$ docker-machine ls
-
-NAME     ACTIVE   DRIVER         STATE     URL                         SWARM
-consul   *        virtualbox     Running   tcp://192.168.99.100:2376
-demo0    -        virtualbox     Running   tcp://192.168.99.101:2376   demo0 (master)
-demo1    -        virtualbox     Running   tcp://192.168.99.102:2376   demo1
-```
+> **NOTE:** You cannot add additional nodes to Docker Desktop.
 
 ## Create a DNS load balancer
 
-In order to load balance the traffic towards several instances of our **app** service, we will add a new service. This one uses the DNS round-robin capability of Docker engine (version 1.11) for containers with the same network alias.
+In order to load balance the traffic towards several instances of our **app** service, we will add a new service. This one uses the DNS round-robin capability of Docker engine (version 1.11+) for containers with the same network alias.
 
 Note: to present the DNS round-robin feature, we do not use the load balancer of the previous chapter (dockercloud/haproxy).
 
-The following Dockerfile uses nginx:1.9 official image and add a custom nginx.conf configuration file.
+The following Dockerfile uses nginx:1.9 official image and add a custom nginx.conf configuration file. Copy the following into a file named `Dockerfile-nginx`:
 
-```
+```dockerfile
 FROM nginx:1.9
 
 # forward request and error logs to docker log collector
@@ -76,11 +43,11 @@ EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 ```
 
-The following nginx.conf file define a proxy_pass directive towards **http://apps** for each request received on port 80.
+Copy the following into a file named `nginx.conf` - this is required by nginx to configure load balancing and defines a proxy_pass directive towards **http://apps** for each request received on port 80.
 
 **apps** is the value we will set as the app service network alias.
 
-```
+```json
 user nginx;
 worker_processes 2;
 events {
@@ -104,14 +71,15 @@ http {
 }
 ```
 
-Let's build and publish the image of this load-balancer to Docker Cloud:
+Let's build and publish the image of this new load balancer to Docker Hub. Reminder - substitute your Hub account info in place of `jimmyarms`:
 
-```
+```bash
 # Create image
-$ docker build -t lucj/lb-dns .
+$ docker build -t jimmyarms/lb-dns -f Dockerfile-nginx .
+[+] Building 13.2s (9/9) FINISHED
 
 # Publish image
-$ docker push -t lucj/lb-dns
+$ docker push -t jimmyarms/lb-dns
 ```
 
 The image can now be used in our Docker Compose file.
@@ -120,11 +88,11 @@ The image can now be used in our Docker Compose file.
 
 The new version of the docker-compose.yml file is the following one
 
-```
-version: '3'
+```yaml
+version: '3.6'
 services:
   mongo:
-    image: mongo:3.2
+    image: mongo:4.2
     networks:
       - backend
     volumes:
@@ -134,7 +102,7 @@ services:
     environment:
       - "constraint:node==demo0"
   lbapp:
-    image: lucj/lb-dns
+    image: jimmyarms/lb-dns
     networks:
       - backend
     ports:
@@ -142,7 +110,7 @@ services:
     environment:
       - "constraint:node==demo0"
   app:
-    image: lucj/message-app
+    image: jimmyarms/labs-nodejs:001
     expose:
       - "80"
     environment:
