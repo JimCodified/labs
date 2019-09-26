@@ -99,23 +99,18 @@ services:
       - mongo-data:/data/db
     expose:
       - "27017"
-    environment:
-      - "constraint:node==demo0"
   lbapp:
     image: jimmyarms/lb-dns
     networks:
       - backend
     ports:
       - "8000:80"
-    environment:
-      - "constraint:node==demo0"
   app:
     image: jimmyarms/labs-nodejs:001
     expose:
       - "80"
     environment:
       - MONGO_URL=mongodb://mongo/messageApp
-      - "constraint:node==demo1"
     networks:
       backend:
         aliases:
