@@ -210,8 +210,12 @@ The following commands are some of the main ones to interact with the applicatio
   * `docker-compose up -d` (-d option enables the application to run in background)
 * Check the status of each services composing the application `docker-compose ps`
   * If you want to send & check for a test msg as we did above, you can see which port is being used by the `app` container in the output. It will look something like `0.0.0.0:32770->1337/tcp`. The port is random but in this instance Docker Engine mapped port 32770 so we would use that in the `curl` commands shown above.
+
+---
+## Load Balancing
+
 * Scale up the application service instances: `docker-compose scale app=3`
-  * Several containers of the app service (our Node.js API) are running and are accessible through random port number of the Docker host. How are the new instantiated containers addressed?
+* Several containers of the app service (our Node.js API) are running and are accessible through random port number of the Docker host. How are the new instantiated containers addressed?
 
 ![3 api containers](images/compose_3apps.png)
 
@@ -230,13 +234,15 @@ To make the application more usable and provide the ability scale up and down wi
 
 Shut down the app to prepare for improvements: `docker-compose down`
 
-## Usage of haproxy image
+## Usage of dockercloud/haproxy image
 
-[haproxy](https://hub.docker.com/_/haproxy) is a good candidate to be used in front of our **app** service. It will update it's configuration each time a container is started / stopped.
+[dockercloud/haproxy](https://hub.docker.com/r/dockercloud/haproxy) is a good candidate to be used in front of our **app** service. It will update it's configuration each time a container is started / stopped.
 
 ![load balancer](images/compose_lb.png)
 
-## Adding load balancer to our Compose file
+> **NOTE:** dockercloud/haproxy is a custom version of the open source haproxy application. It is not recommended for general use but is used here for simplicity. If you need load balancing for your applications you should investigate other solutions like upstream haproxy, traefix, or nginx.
+
+## Adding dockercloud/haproxy load balancer to our Compose file
 
 You can copy the below and overwrite your existing `docker-compose.yaml`:
 
@@ -249,57 +255,134 @@ services:
       - mongo-data:/data/db
     expose:
       - "27017"
+    networks:
+      - backend
   lbapp:
-    image: haproxy
-    links:
+    image: dockercloud/haproxy
+    depends_on:
       - app
+    environment:
+      - BALANCE=leastconn
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - "8000:80"
+      - 80:80
+    links:
+      - app
+    networks:
+      - frontend
   app:
     # NOTE: you should substitute your own Docker Hub image info below
     image: jimmyarms/labs-nodejs:001
-    expose:
-      - "1337"
-    links:
-      - mongo
+    ports:
+      - 1337
+    environment:
+     - SERVICE_PORTS=1337
     depends_on:
       - mongo
     environment:
       - MONGO_URL=mongodb://mongo/messageApp
+    networks:
+      - frontend
+      - backend
 volumes:
   mongo-data:
+networks:
+  frontend:
+  backend:
 ```
 
 The load balancer service has been added to the picture.
-Each request coming to port 8000 of the host (mapped with port 80 of **lbapp** service) is LINKed to the **api** through the load balancer.
+Each request coming to port 80 of the host (mapped with port 80 of **lbapp** service) is LINKed to the **api** through the load balancer.
 
 ## Test our application
 
-Run the new version of our compose file and specify the number of instances of the **app** service
-* ```docker-compose up```
-* ```docker-compose scale app=3```
+Run the new version of our compose file and specify the number of instances of the **app** service:
+
+* `docker-compose up -d`
+* `docker-compose scale app=3`
 
 Let's just test the creation and retrieval of a message
 
-```
-$ curl -XPOST http://192.168.99.100:8000/message?text=hola
+```bash
+$ curl -XPOST http://localhost/message?text=hello
 {
   "text": "hola",
-  "createdAt": "2016-06-08T13:30:18.298Z",
-  "updatedAt": "2016-06-08T13:30:18.298Z",
+  "createdAt": "1569471622195",
+  "updatedAt": "1569471622195",
   "id": "57581deacde05a1200877fa2"
 }
-$ curl -XGET http://192.168.99.100:8000/message
+
+$ curl -XPOST http://localhost/message?text=hola
+{
+  "text": "hello",
+  "createdAt": "1569471622195",
+  "updatedAt": "1569471622195",
+  "id": "57581deacde05a1200877fa2"
+}
+
+$ curl -XPOST http://localhost/message?text=hallo
+{
+  "text": "bonjour",
+  "createdAt": "1569471622195",
+  "updatedAt": "1569471622195",
+  "id": "57581deacde05a1200877fa2"
+}
+
+$ curl -XPOST http://localhost/message?text=bonjour
+{
+  "text": "hallo",
+  "createdAt": "1569471622195",
+  "updatedAt": "1569471622195",
+  "id": "57581deacde05a1200877fa2"
+}
+
+$ curl -XGET http://localhost/message
 [
   {
+    "text": "hello",
+    "createdAt": 1569471622195,
+    "updatedAt": 1569471622195,
+    "id": "5d8c3c86eae3da001839edab"
+  },
+  {
     "text": "hola",
-    "createdAt": "2016-06-08T13:30:18.298Z",
-    "updatedAt": "2016-06-08T13:30:18.298Z",
-    "id": "57581deacde05a1200877fa2"
+    "createdAt": 1569472066058,
+    "updatedAt": 1569472066058,
+    "id": "5d8c3e42eae3da001839edac"
+  },
+  {
+    "text": "hallo",
+    "createdAt": 1569472211485,
+    "updatedAt": 1569472211485,
+    "id": "5d8c3ed3eae3da001839edad"
+  },
+  {
+    "text": "bonjour",
+    "createdAt": 1569472218921,
+    "updatedAt": 1569472218921,
+    "id": "5d8c3eda3caf44001901ab7c"
   }
 ]
 ```
 
-Seems to be good :)
+Congratulations! You've now containerized your application, deployed it locally behind a load balancer so you can scale up and down.
+
+---
+### Clean up
+
+```bash
+$ docker-compose down
+Stopping messageapp_app_3   ... done
+Stopping messageapp_app_2   ... done
+Stopping messageapp_lbapp_1 ... done
+Stopping messageapp_app_1   ... done
+Stopping messageapp_mongo_1 ... done
+Removing messageapp_app_3   ... done
+Removing messageapp_app_2   ... done
+Removing messageapp_lbapp_1 ... done
+Removing messageapp_app_1   ... done
+Removing messageapp_mongo_1 ... done
+Removing network messageapp_backend
+Removing network messageapp_frontend
+```
