@@ -198,47 +198,59 @@ The important part of this file:
   * application service: **app**
 * Link between **app** and **mongo** services done through the MONGO_URL environment variable (using **mongo** service name)
 * Port mapping
-  * mongo service exposes port 27017 (default MongoDB port) only to the other services listed in this Compose file (not to the Docker host)
-  * app service port is mapped to a random port on the host (as no host port as been defined)
+  * mongo service EXPOSEs port 27017 (default MongoDB port) only to the other services listed in this Compose file (not to the Docker host).
+  * app service uses a `port` specification, which means the port will be published and mapped to a random port on the host, as no host port as been defined. If you want to define the port you would use `<external port>:<internal port>` instead of the single port number shown here.
 * Definition of a user defined volume for mongodb data folder
 
 ## Lifecycle and scalability
 
 The following commands are some of the main ones to interact with the application
 
-* Start the application ```docker-compose up -d```  (-d option enables the application to run in background)
-* Check the status of each services conposing the application ```docker-compose ps```
-* Stop the application ```docker-compose stop```
-* Scale the app service changing the number of instances ```docker-compose scale app=3```
+* Start your application again, this time using Compose:
+  * `docker-compose up -d` (-d option enables the application to run in background)
+* Check the status of each services composing the application `docker-compose ps`
+  * If you want to send & check for a test msg as we did above, you can see which port is being used by the `app` container in the output. It will look something like `0.0.0.0:32770->1337/tcp`. The port is random but in this instance Docker Engine mapped port 32770 so we would use that in the `curl` commands shown above.
+* Scale up the application service instances: `docker-compose scale app=3`
+  * Several containers of the app service (our Node.js API) are running and are accessible through random port number of the Docker host. How are the new instantiated containers addressed?
 
-![3 api containers](https://dl.dropboxusercontent.com/u/2330187/docker/labs/node/single_host_net_1.png)
+![3 api containers](images/compose_3apps.png)
 
-Several containers of the app service (our Node.js API) are running and are accessible through random port number of the Docker host. Wow are the new instanciated containers addressed ?
+* If you run `docker-compose ps` again you'll see all the containers and the ports they're using.
 
-=> Need to add a load balancer that will be updated each time a container is created or removed and that will forward each request to a running instance of the app service.
+```bash
+       Name                     Command               State                Ports             
+---------------------------------------------------------------------------------------------
+messageapp_app_1     docker-entrypoint.sh npm start   Up      0.0.0.0:32774->1337/tcp, 80/tcp
+messageapp_app_2     docker-entrypoint.sh npm start   Up      0.0.0.0:32776->1337/tcp, 80/tcp
+messageapp_app_3     docker-entrypoint.sh npm start   Up      0.0.0.0:32775->1337/tcp, 80/tcp
+messageapp_mongo_1   docker-entrypoint.sh mongod      Up      27017/tcp
+```
 
-## Usage of dockercloud/haproxy image
+To make the application more usable and provide the ability scale up and down without keeping track of all the separate port mappings, we need to add a load balancer that will be updated each time a container is created or removed and that will forward each request to a running instance of the app service.
 
-[dockercloud/haproxy](https://store.docker.com/images/haproxy) is a good candidate to be used in front of our **app** service.
-It will update it's configuration each time a container is started / stopped.
+Shut down the app to prepare for improvements: `docker-compose down`
 
-![load balancer](https://dl.dropboxusercontent.com/u/2330187/docker/labs/node/single_host_net_2.png)
+## Usage of haproxy image
+
+[haproxy](https://hub.docker.com/_/haproxy) is a good candidate to be used in front of our **app** service. It will update it's configuration each time a container is started / stopped.
+
+![load balancer](images/compose_lb.png)
 
 ## Adding load balancer to our Compose file
 
-The new version of our docker-compose.yml is
+You can copy the below and overwrite your existing `docker-compose.yaml`:
 
-```
-version: '3'
+```yaml
+version: '3.6'
 services:
   mongo:
-    image: mongo:3.2
+    image: mongo:4.2
     volumes:
       - mongo-data:/data/db
     expose:
       - "27017"
- lbapp:
-    image: dockercloud/haproxy
+  lbapp:
+    image: haproxy
     links:
       - app
     volumes:
@@ -246,7 +258,8 @@ services:
     ports:
       - "8000:80"
   app:
-    image: message-app
+    # NOTE: you should substitute your own Docker Hub image info below
+    image: jimmyarms/labs-nodejs:001
     expose:
       - "1337"
     links:
@@ -260,7 +273,7 @@ volumes:
 ```
 
 The load balancer service has been added to the picture.
-Each request coming to port 8000 of the host (mapped with port 80 of lbapi) will go to the api through the load balancer.
+Each request coming to port 8000 of the host (mapped with port 80 of **lbapp** service) is LINKed to the **api** through the load balancer.
 
 ## Test our application
 
