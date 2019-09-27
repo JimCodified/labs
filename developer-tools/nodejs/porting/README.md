@@ -26,11 +26,9 @@ Some of the Docker basics will be reviewed but it is recommended to follow [Dock
 
 [Single Docker host networking](4_single_host_networking.md)
 
-[Networking across multiple Docker hosts](5_multiple_hosts_networking.md)
+[Deploy on a Docker Swarm](5_deploy_on_swarm.md)
 
-[Deploy on a Docker Swarm](6_deploy_on_swarm.md)
-
-[Deploy on Kubernetes](7_deploy_on_kubernetes.md)
+[Deploy on Kubernetes](6_deploy_on_kubernetes.md)
 
 ## Summary
 

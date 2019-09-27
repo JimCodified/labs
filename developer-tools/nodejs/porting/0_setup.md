@@ -88,15 +88,21 @@ It's not required in the labs, but [BuildKit](https://docs.docker.com/develop/de
 To enable BuildKit:
 
 * Set an environment variable:
-  * `DOCKER_BUILDKIT=1` on macOS or Linux
+  * `DOCKER_BUILDKIT=1` on macOS or Linux, or
   * `setx DOCKER_BUILDKIT 1` on Windows 10
 
-You can also use the Preferences panel in Docker Desktop to turn on BuildKit:
+Alternatively, you can also use the Preferences panel in Docker Desktop to turn on BuildKit:
 
-1. Click the "Daemon" tab and then the "Advanced" button (you do not need to enable Experimental features)
+* Click the "Daemon" tab and then the "Advanced" button (you do not need to enable Experimental features)
 
 ![daemon tab](images/dd_daemon.png)
 
-2. Add the following lines then apply and Docker Desktop will prompt you to restart to activate the new features:
+2. Add the following lines then apply and Docker Desktop will prompt you to restart to activate the new features (the comma is important):
+
+```json
+  "features" : {
+    "buildkit": true
+  },
+```
 
 ![buildkit](images/dd_buildkit.png)
