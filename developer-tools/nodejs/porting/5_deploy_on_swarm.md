@@ -23,14 +23,12 @@ That's it! You've not got a Docker Swarm-enabled node. If you're on a Linux syst
 
 ## Create a DNS load balancer
 
-In order to load balance the traffic towards several instances of our **app** service, we will add a new service. This one uses the DNS round-robin capability of Docker engine (version 1.11+) for containers with the same network alias.
-
-Note: to present the DNS round-robin feature, we do not use the load balancer of the previous chapter (dockercloud/haproxy).
+In order to load balance the traffic towards several instances of our **app** service, we will add a new service. To provide an example that's more realistic than the last exercise we'll use Nginx to do the load balancing, and use the DNS round-robin capability of Docker Engin for containers with the same network alias. Similar to before, this lets us scale our containers up & down without the need to track IP addresses and/or ports.
 
 The following Dockerfile uses nginx:1.9 official image and add a custom nginx.conf configuration file. Copy the following into a file named `Dockerfile-nginx`:
 
 ```dockerfile
-FROM nginx:1.9
+FROM nginx:1.17.4-alpine
 
 # forward request and error logs to docker log collector
 RUN ln -sf /dev/stdout /var/log/nginx/access.log
@@ -43,11 +41,11 @@ EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 ```
 
-Copy the following into a file named `nginx.conf` - this is required by nginx to configure load balancing and defines a proxy_pass directive towards **http://apps** for each request received on port 80.
+Copy the following into a file named `nginx.conf` - this is required by nginx to configure load balancing and defines a proxy_pass directive towards **http://apps** on port 1337 for each request received on port 80.
 
 **apps** is the value we will set as the app service network alias.
 
-```json
+```text
 user nginx;
 worker_processes 2;
 events {
@@ -65,7 +63,7 @@ http {
     set $alias "apps";
 
     location / {
-      proxy_pass http://$alias;
+      proxy_pass http://$alias:1337;
     }
   }
 }
@@ -75,11 +73,11 @@ Let's build and publish the image of this new load balancer to Docker Hub. Remin
 
 ```bash
 # Create image
-$ docker build -t jimmyarms/lb-dns -f Dockerfile-nginx .
+$ docker build -t jimmyarms/lb-dns:001 -f Dockerfile-nginx .
 [+] Building 13.2s (9/9) FINISHED
 
 # Publish image
-$ docker push -t jimmyarms/lb-dns
+$ docker push -t jimmyarms/lb-dns:001
 ```
 
 The image can now be used in our Docker Compose file.
@@ -97,49 +95,99 @@ services:
       - backend
     volumes:
       - mongo-data:/data/db
-    expose:
-      - "27017"
   lbapp:
-    image: jimmyarms/lb-dns
+    image: jimmyarms/lb-dns:001
     networks:
-      - backend
+      - frontend
     ports:
       - "8000:80"
   app:
     image: jimmyarms/labs-nodejs:001
-    expose:
-      - "80"
     environment:
       - MONGO_URL=mongodb://mongo/messageApp
     networks:
-      backend:
+      frontend:
         aliases:
           - apps
+      backend:
     depends_on:
       - lbapp
 volumes:
   mongo-data:
 networks:
+  frontend:
+    driver: overlay
   backend:
     driver: overlay
 ```
 
 There are several important updates here
-* usage of the lb-dns image for the load balancer service
-* constraints to choose the nodes on which each service will run (needed in our example to illustrate the DNS round robin)
-* creation of a new user-defined overlay network to enable each container to communicate with each other through their name
-* for each service, definition of the network used
-* definition of network alias for the **app** service (crucial item as this is the one that will enable nginx to proxy requests)
+
+* Usage of the lb-dns image for the load balancer service, which is built on nginx
+* Creation of two user-defined overlay networks to enable appropriate container communication
+  * Our nginx load balancer can talk to the app service, using the **apps** network alias instead of explicit addresses & ports
+  * **apps** will be resolved by the internal Docker Engine DNS server and round robin amongst the services
+  * The **app** service can communicate to the **mongo** service on the `backend` network
+  * The **lbapp** service CANNOT communicate to the **mongo** service since they are not on the same network
 
 ## Deployment and scaling of the application
 
-In order to run the application in this Swarm, we will issue the following commands
-* switch to the swarm master context ```eval $(docker-machine env --swarm demo0)```
-* run the new compose file ```docker-compose up```
-* increase the number of **app** service instances ```docker-compose scale app=5```
+* In order to run the application in this Swarm, we use the following command:
 
-Our application is then available through http://192.168.99.101:8000/message
+```bash
+$ docker stack deploy -c docker-compose.yaml messageapp
+Creating network messageapp_frontend
+Creating network messageapp_backend
+Creating service messageapp_app
+Creating service messageapp_mongo
+Creating service messageapp_lbapp
+```
 
-192.168.99.101 is the IP of the Swarm master. 8000 is the port exported by the load balancer to the outside.
+* Increase the number of **app** service instances. Since we used `stack deploy` all the services in our application are prefaced with the name of the stack, in this case `messageapp`. So to scale the app service enter this command:
 
+```bash
+$ docker service scale messageapp_app=3
 
+messageapp_app scaled to 3
+overall progress: 3 out of 3 tasks
+1/3: running
+2/3: running
+3/3: running
+verify: Service converged
+```
+
+Our application is still available through http://localhost:8000/message
+
+```bash
+# find the container ID for the lb-dns
+$ docker container ls
+CONTAINER ID        IMAGE                       COMMAND                  CREATED             STATUS              PORTS               NAMES
+a122ec48cc14        jimmyarms/lb-dns:001        "nginx -g 'daemon of…"   6 minutes ago       Up 6 minutes        80/tcp, 443/tcp     messageapp_lbapp.1.odl7kfllftqsibtsf4q880rlt
+f6f94f168906        jimmyarms/labs-nodejs:001   "docker-entrypoint.s…"   6 minutes ago       Up 6 minutes        80/tcp              messageapp_app.1.nwiqkf5cv0ycnc30thae09z4j
+f62b45ccdbb3        mongo:4.2                   "docker-entrypoint.s…"   6 minutes ago       Up 6 minutes        27017/tcp           messageapp_mongo.1.regybe6mzoke5g508n7wct5q7
+
+# exec in to the lb-dns container
+$ docker exec -it a122 /bin/sh
+
+# verify you can ping the app service
+> ping apps -c 3
+PING apps (10.0.9.2): 56 data bytes
+64 bytes from 10.0.9.2: icmp_seq=0 ttl=64 time=0.093 ms
+64 bytes from 10.0.9.2: icmp_seq=1 ttl=64 time=0.123 ms
+64 bytes from 10.0.9.2: icmp_seq=2 ttl=64 time=0.175 ms
+--- apps ping statistics ---
+3 packets transmitted, 3 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 0.093/0.130/0.175/0.034 ms
+
+# now try mongo
+> ping mongo -c 3
+ping: unknown host
+```
+
+---
+
+## Clean-up
+
+Congratulations! You've now used the Docker Swarm orchestrator! The same techniques in this exercise will work on a single node like Docker Desktop, or across an entire cluster.
+
+In the final section we'll transform our Compose-based services in to a Docker App, and deploy to Kubernetes

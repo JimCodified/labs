@@ -368,6 +368,8 @@ $ curl -XGET http://localhost/message
 
 Congratulations! You've now containerized your application, deployed it locally behind a load balancer so you can scale up and down.
 
+Everything up to this point has applied only to a single node - there is no orchestration other than what a single Docker Engine can provide. In the last couple sections we'll look at how to use orchestration with Docker Swarm and Kubernetes.
+
 ---
 ### Clean up
 
