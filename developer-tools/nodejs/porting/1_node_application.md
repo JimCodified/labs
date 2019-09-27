@@ -25,11 +25,12 @@ DELETE | /message/ID | delete message with ID
 * Create the  application:  ```sails new messageApp && cd messageApp```
   * When prompted to "Choose a template" select option _2. Empty_
 * Link application to local MongoDB
-  * usage of sails-mongo orm: ```npm install sails-mongo --save```
-  * change the lines shown below in the two following configuration files (both files have many other lines - you only need to edit the settings shown here):
+  * `npm install sails-mongo --save`
+* There are two SailsJS configuration files we need to modify to get our application to work. Change the lines shown below in the two files listed (both files have many other lines - you only need to edit the settings shown here):
 
 ```javascript
 config/model.js:
+
 module.exports.models = {
   migrate: 'alter',
   id: { type: 'string', columnName: '_id' },
@@ -38,6 +39,7 @@ module.exports.models = {
 
 ```javascript
 config/datastores.js:
+
 module.exports.datastores = {
   default: {
      adapter: 'sails-mongo',
@@ -46,38 +48,37 @@ module.exports.datastores = {
 };
 ```
 
+You can also edit the package.json file so that we start up in the development environment:
 ```json
 package.json:
   "start": "NODE_ENV=development node app.js",
 ```
 
-* Generate the API scafold  ```sails generate api message```
-* Run the application: ```sails lift```
+* Generate the API scafold:
+  * `sails generate api message`
+* Run the application: 
+  * `sails lift`
 * The API is available locally on port 1337 (default Sails.js port)
 
 ## Test the application in command line
 
-* Get current list of messages
-  * `curl http://localhost:1337/message`
-
-```
+``` bash
+# Get current list of messages
+$ curl http://localhost:1337/message
 []
-```
 
-* Create new messages
-  * `curl -XPOST http://localhost:1337/message?text=hello`
-  * `curl -XPOST http://localhost:1337/message?text=hola`
-  
-* Get list of messages
-  * `curl http://localhost:1337/message`
+# Create new messages
+$ curl -XPOST http://localhost:1337/message?text=hello
+$ curl -XPOST http://localhost:1337/message?text=hola
 
-```
+# Get list of messages
+$ curl http://localhost:1337/message
 [
   {
     "text": "hello",
     "createdAt": "2015-11-08T13:15:15.363Z",
     "updatedAt": "2015-11-08T13:15:15.363Z",
-    "id": "5638b363c5cd0825511690bd" 
+    "id": "5638b363c5cd0825511690bd"
   },
   {
     "text": "hola",
@@ -86,19 +87,19 @@ package.json:
     "id": "5638b381c5cd0825511690be"
   }
 ]
-```
-* Modify a message
-  * `curl -XPUT http://localhost:1337/message/5638b363c5cd0825511690bd?text=hey`
-  * Note that you will have to substitute your own "id" value from the previous list of messages in place of the value `5638b363c5cd0825511690bd` shown in the example.
 
-* Delete a message
-  * `curl -XDELETE http://localhost:1337/message/5638b381c5cd0825511690be`
-  * Again, substitute one of your own "id" values
+# Modify a message
+# Note that you will have to substitute your own "id" value from the previous list of messages in place of the value `5638b363c5cd0825511690bd` shown in the example.
+$ curl -XPUT http://localhost:1337/message/5638b363c5cd0825511690bd?text=hey
 
-* Get list of messages
-  * `curl http://localhost:1337/message`
+# Delete a message
+# Again, substitute one of your own "id" values
+$ curl -XDELETE http://localhost:1337/message/5638b381c5cd0825511690be
 
-```
+# Get list of messages
+$ curl http://localhost:1337/message
+
+
 [
   {
     "text": "hey",

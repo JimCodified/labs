@@ -63,7 +63,7 @@ Basically, the Dockerfile performs the following actions:
 docker build -t message-app .
 ```
 
-* List all images available on the Docker host with the name "message-app": 
+* List all images available on the Docker host with the name "message-app":
 
 ```bash
 docker images message-app
